@@ -1,0 +1,63 @@
+name: Smart Boost Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      PKG: tw.nekomimi.nekogram.smart
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk/2* /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "build-tools;37.0.0 ndk;27.3.13750724 platforms;android-37.0 cmake;3.22.1"
+
+      - name: Configure build
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+        run: |
+          test -n "$API_ID" && test -n "$API_HASH" || { echo "Set API_ID and API_HASH repo secrets (my.telegram.org)"; exit 1; }
+          echo "apiId=$API_ID"   >> local.properties
+          echo "apiHash=$API_HASH" >> local.properties
+          mkdir -p ~/.gradle
+          echo 'org.gradle.jvmargs=-Xmx12g -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+          # Separate package so it installs next to official Nekogram for A/B speed tests
+          sed -i "s/^APP_PACKAGE=.*/APP_PACKAGE=$PKG/" gradle.properties
+          # arm64 only, keeps the native build within free-runner limits
+          sed -i 's/include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"/include "arm64-v8a"/' TMessagesProj_App/build.gradle
+          # No Sentry upload without credentials
+          sed -i 's/uploadNativeSymbols = true/uploadNativeSymbols = false/; s/includeSourceContext = true/includeSourceContext = false/' TMessagesProj_App/build.gradle
+          # Placeholder Firebase config (push via FCM won't work in this build)
+          cat > TMessagesProj_App/google-services.json <<JSON
+          {"project_info":{"project_number":"000000000000","project_id":"nekogram-smart","storage_bucket":"nekogram-smart.appspot.com"},
+           "client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"$PKG"}},
+           "oauth_client":[],"api_key":[{"current_key":"AIzaSyDummyDummyDummyDummyDummyDummyDum"}],
+           "services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}
+          JSON
+
+      - name: Build
+        run: ./gradlew :TMessagesProj_App:assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nekogram-smart-arm64
+          path: TMessagesProj_App/build/outputs/apk/release/*.apk
