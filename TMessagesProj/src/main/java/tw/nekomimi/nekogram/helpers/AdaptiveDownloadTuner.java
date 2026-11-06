@@ -7,7 +7,7 @@ import org.telegram.tgnet.ConnectionsManager;
 /**
  * Smart (adaptive) download boost for non-Premium accounts.
  * <p>
- * Hill-climbs the native in-flight byte budget per account from measured throughput:
+ * Starts at Nullgram-level parallelism (6MB in flight, 8 connections) and hill-climbs the native in-flight byte budget per account from measured throughput:
  * grows while more data in flight actually helps, steps back once the server-side
  * cap is reached, and drops to the stock budget when throughput collapses
  * (native tgnet retries FLOOD_WAIT / FLOOD_PREMIUM_WAIT internally, so a sudden
@@ -17,19 +17,19 @@ public final class AdaptiveDownloadTuner {
 
     /** 512KB: divides 1MB and is 4KB-aligned, as upload.getFile requires. */
     public static final int CHUNK_SIZE = 512 * 1024;
-    public static final int MIN_BUDGET = 2 * 1024 * 1024;
-    public static final int MAX_BUDGET = 8 * 1024 * 1024;
+    public static final int MIN_BUDGET = 6 * 1024 * 1024;
+    public static final int MAX_BUDGET = 16 * 1024 * 1024;
     public static final int MAX_IN_FLIGHT_REQUESTS = MAX_BUDGET / CHUNK_SIZE;
     /** Must be a power of two. */
-    public static final int CONNECTIONS = 4;
+    public static final int CONNECTIONS = 8;
 
-    private static final long WINDOW_MS = 1500;
+    private static final long WINDOW_MS = 2000;
     private static final long IDLE_GAP_MS = 4000;
     private static final double GAIN_THRESHOLD = 1.08;
-    private static final double COLLAPSE_RATIO = 0.5;
+    private static final double COLLAPSE_RATIO = 0.35;
     private static final long HOLD_MS = 15_000;
     private static final long COOLDOWN_MS = 20_000;
-    private static final int STEP = 512 * 1024;
+    private static final int STEP = 1024 * 1024;
 
     private static final class State {
         int budget = MIN_BUDGET;
