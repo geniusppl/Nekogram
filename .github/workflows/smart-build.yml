@@ -58,6 +58,12 @@ jobs:
           sed -i "s/^APP_PACKAGE=.*/APP_PACKAGE=$PKG/" gradle.properties
           # arm64 only, keeps the native build within free-runner limits
           sed -i 's/include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"/include "arm64-v8a"/' TMessagesProj_App/build.gradle
+          # arm64 only, without injected ABI (that marks the APK testOnly)
+          sed -i 's/include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"/include "arm64-v8a"/; s/universalApk true/universalApk false/' TMessagesProj_App/build.gradle
+          for f in TMessagesProj/build.gradle TMessagesProj_App/build.gradle; do
+            sed -i '0,/defaultConfig {/s//defaultConfig {\n        ndk { abiFilters "arm64-v8a" }/' $f
+          done
+          grep -n -A2 "defaultConfig {" TMessagesProj/build.gradle TMessagesProj_App/build.gradle
           # No Sentry upload without credentials
           sed -i 's/uploadNativeSymbols = true/uploadNativeSymbols = false/; s/includeSourceContext = true/includeSourceContext = false\n    autoUploadProguardMapping = false/' TMessagesProj_App/build.gradle
           # Placeholder Firebase config (push via FCM won't work in this build)
@@ -69,7 +75,7 @@ jobs:
           JSON
 
       - name: Build
-        run: ./gradlew :TMessagesProj_App:assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon -x uploadSentryProguardMappingsRelease
+        run: ./gradlew :TMessagesProj_App:assembleRelease --no-daemon -x uploadSentryProguardMappingsRelease
 
       - name: List outputs
         if: always()
@@ -79,7 +85,7 @@ jobs:
         if: always()
         with:
           name: Nekogram-smart-arm64
-          path: TMessagesProj_App/build/intermediates/apk/release/*.apk
+          path: TMessagesProj_App/build/outputs/apk/release/*.apk
 
       - name: Publish prerelease
         uses: softprops/action-gh-release@v2
@@ -88,4 +94,4 @@ jobs:
           name: Nekogram Smart Boost ${{ github.run_number }}
           prerelease: true
           target_commitish: ${{ github.sha }}
-          files: TMessagesProj_App/build/intermediates/apk/release/*.apk
+          files: TMessagesProj_App/build/outputs/apk/release/*.apk
