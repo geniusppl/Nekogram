@@ -62,6 +62,7 @@ public:
     ConnectionState getConnectionState();
     void setUserId(int64_t userId);
     void setUserPremium(bool premium);
+    void setDownloadBudget(uint32_t bytes);
     void switchBackend(bool restart);
     void resumeNetwork(bool partial);
     void pauseNetwork();
@@ -243,6 +244,7 @@ private:
     std::string currentLogPath;
     int64_t currentUserId = 0;
     bool currentUserPremium = false;
+    uint32_t downloadBudgetOverride = 0;
     bool registeredForInternalPush = false;
     bool pushConnectionEnabled = true;
     int32_t currentPerformanceClass = -1;

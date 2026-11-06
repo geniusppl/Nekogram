@@ -254,6 +254,10 @@ void setUserId(JNIEnv *env, jclass c, jint instanceNum, int64_t id) {
     ConnectionsManager::getInstance(instanceNum).setUserId(id);
 }
 
+void setDownloadBudget(JNIEnv *env, jclass c, jint instanceNum, jint bytes) {
+    ConnectionsManager::getInstance(instanceNum).setDownloadBudget(bytes > 0 ? (uint32_t) bytes : 0);
+}
+
 void setUserPremium(JNIEnv *env, jclass c, jint instanceNum, bool premium) {
     ConnectionsManager::getInstance(instanceNum).setUserPremium(premium);
 }
@@ -569,6 +573,7 @@ static JNINativeMethod ConnectionsManagerMethods[] = {
         {"native_setProxySettings", "(ILjava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", (void *) setProxySettings},
         {"native_getConnectionState", "(I)I", (void *) getConnectionState},
         {"native_setUserId", "(IJ)V", (void *) setUserId},
+        {"native_setDownloadBudget", "(II)V", (void *) setDownloadBudget},
         {"native_init", "(IIIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJZZZII)V", (void *) init},
         {"native_setLangCode", "(ILjava/lang/String;)V", (void *) setLangCode},
         {"native_setRegId", "(ILjava/lang/String;)V", (void *) setRegId},

@@ -34,6 +34,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipException;
 
 import tw.nekomimi.nekogram.NekoConfig;
+import tw.nekomimi.nekogram.helpers.AdaptiveDownloadTuner;
 
 public class FileLoadOperation {
 
@@ -300,6 +301,13 @@ public class FileLoadOperation {
     }
 
     private void updateParams() {
+        if (NekoConfig.downloadSpeedBoost == NekoConfig.BOOST_SMART && !forceSmallChunk) {
+            downloadChunkSizeBig = AdaptiveDownloadTuner.CHUNK_SIZE;
+            maxDownloadRequests = AdaptiveDownloadTuner.MAX_IN_FLIGHT_REQUESTS;
+            maxDownloadRequestsBig = AdaptiveDownloadTuner.MAX_IN_FLIGHT_REQUESTS;
+            maxCdnParts = (int) (FileLoader.DEFAULT_MAX_FILE_SIZE / downloadChunkSizeBig);
+            return;
+        }
         if ((NekoConfig.downloadSpeedBoost == NekoConfig.BOOST_AVERAGE || preloadPrefixSize > 0 || MessagesController.getInstance(currentAccount).getfileExperimentalParams) && !forceSmallChunk) {
             downloadChunkSizeBig = 1024 * 512;
             maxDownloadRequests = 8;
@@ -854,6 +862,13 @@ public class FileLoadOperation {
             downloadConnectionsCount = premium ? ConnectionsManager.DownloadConnectionsCount : 2;
             int byteBudget = (premium ? 16 : 2) * 1024 * 1024;
             currentMaxDownloadRequests = byteBudget / currentDownloadChunkSize;
+            if (!premium && NekoConfig.downloadSpeedBoost == NekoConfig.BOOST_SMART) {
+                // Pool size must stay a power of two (index uses & (n - 1)).
+                downloadConnectionsCount = AdaptiveDownloadTuner.CONNECTIONS;
+                // Queue up to the tuner's ceiling; native tgnet gates live by the adaptive byte budget.
+                currentMaxDownloadRequests = Math.max(2, AdaptiveDownloadTuner.MAX_BUDGET / currentDownloadChunkSize);
+                AdaptiveDownloadTuner.ensureApplied(currentAccount);
+            }
         }
     }
 
@@ -2647,6 +2662,9 @@ public class FileLoadOperation {
                         }, null, null, 0, this.datacenterId, ConnectionsManager.ConnectionTypeGeneric, true);
                     }
                 } else {
+                    if (NekoConfig.downloadSpeedBoost == NekoConfig.BOOST_SMART && response != null) {
+                        AdaptiveDownloadTuner.onBytes(currentAccount, response.getObjectSize());
+                    }
                     if (response instanceof TLRPC.TL_upload_file) {
                         requestInfo.response = (TLRPC.TL_upload_file) response;
                     } else if (response instanceof TLRPC.TL_upload_webFile) {

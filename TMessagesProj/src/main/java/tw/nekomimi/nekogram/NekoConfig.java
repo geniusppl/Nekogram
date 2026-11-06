@@ -52,6 +52,7 @@ public class NekoConfig {
     public static final int BOOST_NONE = 0;
     public static final int BOOST_AVERAGE = 1;
     public static final int BOOST_EXTREME = 2;
+    public static final int BOOST_SMART = 3;
 
     public static final int TRANSCRIBE_AUTO = 0;
     public static final int TRANSCRIBE_PREMIUM = 1;
@@ -793,6 +794,9 @@ public class NekoConfig {
     }
 
     public static void setDownloadSpeedBoost(int value) {
+        if (downloadSpeedBoost == BOOST_SMART && value != BOOST_SMART) {
+            tw.nekomimi.nekogram.helpers.AdaptiveDownloadTuner.reset();
+        }
         downloadSpeedBoost = value;
         preferences.edit().putInt("downloadSpeedBoost2", value).apply();
     }

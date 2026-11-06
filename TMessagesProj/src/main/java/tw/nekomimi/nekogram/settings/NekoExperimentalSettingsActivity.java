@@ -60,6 +60,8 @@ public class NekoExperimentalSettingsActivity extends BaseNekoSettingsActivity {
                         LocaleController.getString(R.string.DownloadSpeedBoostNone);
                 case NekoConfig.BOOST_EXTREME ->
                         LocaleController.getString(R.string.DownloadSpeedBoostExtreme);
+                case NekoConfig.BOOST_SMART ->
+                        LocaleController.getString(R.string.DownloadSpeedBoostSmart);
                 default -> LocaleController.getString(R.string.DownloadSpeedBoostAverage);
             }).slug("downloadSpeedBoost"));
         }
@@ -200,6 +202,8 @@ public class NekoExperimentalSettingsActivity extends BaseNekoSettingsActivity {
             types.add(NekoConfig.BOOST_AVERAGE);
             arrayList.add(LocaleController.getString(R.string.DownloadSpeedBoostExtreme));
             types.add(NekoConfig.BOOST_EXTREME);
+            arrayList.add(LocaleController.getString(R.string.DownloadSpeedBoostSmart));
+            types.add(NekoConfig.BOOST_SMART);
             showPopup(arrayList, types.indexOf(NekoConfig.downloadSpeedBoost), item, view, i -> {
                 NekoConfig.setDownloadSpeedBoost(types.get(i));
                 listView.adapter.notifyItemChanged(position, PARTIAL);

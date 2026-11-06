@@ -11,6 +11,10 @@ public:
     explicit DownloadRequestBudget(bool premium) : limit((premium ? 16u : 2u) * 1024 * 1024) {
     }
 
+    // Nekogram smart boost: explicit limit chosen by the adaptive tuner.
+    explicit DownloadRequestBudget(uint32_t explicitLimit) : limit(explicitLimit) {
+    }
+
     void account(uint32_t dc, bool small, uint32_t bytes) {
         used[{dc, small}] += bytes;
     }

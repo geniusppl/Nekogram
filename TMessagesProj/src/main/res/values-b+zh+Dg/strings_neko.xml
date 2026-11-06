@@ -232,6 +232,7 @@
     <string name="DownloadSpeedBoostNone">关闭</string>
     <string name="DownloadSpeedBoostAverage">开启</string>
     <string name="DownloadSpeedBoostExtreme">极高</string>
+    <string name="DownloadSpeedBoostSmart">智能（自适应）</string>
     <string name="NoUpdateAvailablePlay">请在 Play 商店检查更新。</string>
     <string name="NoUpdateAvailablePlayDelay">由于谷歌的审核，Play 商店中的更新通常比直接的 APK 来得慢。</string>
     <string name="DownloadEmojiSet">下载 %s</string>

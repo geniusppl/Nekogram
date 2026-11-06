@@ -2021,6 +2021,12 @@ void ConnectionsManager::bindRequestToGuid(int32_t requestToken, int32_t guid) {
     });
 }
 
+void ConnectionsManager::setDownloadBudget(uint32_t bytes) {
+    scheduleTask([&, bytes] {
+        downloadBudgetOverride = bytes;
+    });
+}
+
 void ConnectionsManager::setUserPremium(bool premium) {
     scheduleTask([&, premium] {
         currentUserPremium = premium;
@@ -2722,7 +2728,9 @@ void ConnectionsManager::processRequestQueue(uint32_t connectionTypes, uint32_t 
 
     // Snapshot after retries/migrations, which can remove or requeue requests.
     // No persistent reservations to leak on cancellation or DC changes.
-    DownloadRequestBudget downloadBudget(currentUserPremium);
+    DownloadRequestBudget downloadBudget = (!currentUserPremium && downloadBudgetOverride > 0)
+            ? DownloadRequestBudget(downloadBudgetOverride)
+            : DownloadRequestBudget(currentUserPremium);
     for (const auto &request : runningRequests) {
         if (!request->cancelled && (request->connectionType & 0xffff) == ConnectionTypeDownload) {
             uint32_t datacenterId = request->datacenterId == DEFAULT_DATACENTER_ID ? currentDatacenterId : request->datacenterId;
