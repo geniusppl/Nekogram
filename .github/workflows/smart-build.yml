@@ -56,7 +56,7 @@ jobs:
           # arm64 only, keeps the native build within free-runner limits
           sed -i 's/include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"/include "arm64-v8a"/' TMessagesProj_App/build.gradle
           # No Sentry upload without credentials
-          sed -i 's/uploadNativeSymbols = true/uploadNativeSymbols = false/; s/includeSourceContext = true/includeSourceContext = false/' TMessagesProj_App/build.gradle
+          sed -i 's/uploadNativeSymbols = true/uploadNativeSymbols = false/; s/includeSourceContext = true/includeSourceContext = false\n    autoUploadProguardMapping = false/' TMessagesProj_App/build.gradle
           # Placeholder Firebase config (push via FCM won't work in this build)
           cat > TMessagesProj_App/google-services.json <<JSON
           {"project_info":{"project_number":"000000000000","project_id":"nekogram-smart","storage_bucket":"nekogram-smart.appspot.com"},
@@ -66,9 +66,10 @@ jobs:
           JSON
 
       - name: Build
-        run: ./gradlew :TMessagesProj_App:assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon
+        run: ./gradlew :TMessagesProj_App:assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon -x uploadSentryProguardMappingsRelease
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: Nekogram-smart-arm64
           path: TMessagesProj_App/build/outputs/apk/release/*.apk
