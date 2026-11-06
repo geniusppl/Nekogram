@@ -2,6 +2,8 @@ name: Smart Boost Build
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ "smart-download" ]
 
 jobs:
   build:
