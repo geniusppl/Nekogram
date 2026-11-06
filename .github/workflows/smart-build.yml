@@ -5,6 +5,9 @@ on:
   push:
     branches: [ "smart-download" ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -76,6 +79,13 @@ jobs:
         if: always()
         with:
           name: Nekogram-smart-arm64
-          path: |
-            **/build/outputs/apk/**/*.apk
-            !**/*-unsigned.apk
+          path: TMessagesProj_App/build/intermediates/apk/release/*.apk
+
+      - name: Publish prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: smart-${{ github.run_number }}
+          name: Nekogram Smart Boost ${{ github.run_number }}
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          files: TMessagesProj_App/build/intermediates/apk/release/*.apk
