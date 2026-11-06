@@ -15,10 +15,10 @@ import org.telegram.tgnet.ConnectionsManager;
  */
 public final class AdaptiveDownloadTuner {
 
-    /** 1MB: the largest part upload.getFile allows; offsets stay 1MB-aligned. */
-    public static final int CHUNK_SIZE = 1024 * 1024;
-    public static final int MIN_BUDGET = 8 * 1024 * 1024;
-    public static final int MAX_BUDGET = 32 * 1024 * 1024;
+    /** 512KB: divides 1MB and is 4KB-aligned, as upload.getFile requires. */
+    public static final int CHUNK_SIZE = 512 * 1024;
+    public static final int MIN_BUDGET = 6 * 1024 * 1024;
+    public static final int MAX_BUDGET = 16 * 1024 * 1024;
     public static final int MAX_IN_FLIGHT_REQUESTS = MAX_BUDGET / CHUNK_SIZE;
     /** Must be a power of two. */
     public static final int CONNECTIONS = 8;
@@ -29,7 +29,7 @@ public final class AdaptiveDownloadTuner {
     private static final double COLLAPSE_RATIO = 0.35;
     private static final long HOLD_MS = 15_000;
     private static final long COOLDOWN_MS = 20_000;
-    private static final int STEP = 2 * 1024 * 1024;
+    private static final int STEP = 1024 * 1024;
 
     private static final class State {
         int budget = MIN_BUDGET;
