@@ -45,6 +45,10 @@ jobs:
           fi
           echo "apiId=$API_ID"   >> local.properties
           echo "apiHash=$API_HASH" >> local.properties
+          echo "sentryDsn=" >> local.properties
+          echo "helperBotId=0" >> local.properties
+          echo "helperBotUsername=" >> local.properties
+          echo "mapsApiKey=none" >> local.properties
           mkdir -p ~/.gradle
           echo 'org.gradle.jvmargs=-Xmx12g -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
           # Separate package so it installs next to official Nekogram for A/B speed tests
