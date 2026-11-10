@@ -354,4 +354,5 @@
     <string name="LiquidGlass">Liquid Glass</string>
     <string name="LiquidGlassInfo">Lens refraction, blur and highlights on bars, tabs, menus, dialogs and message bubbles. Uses more GPU.</string>
     <string name="LiquidGlassRequires13">Requires Android 13+</string>
+    <string name="GlassCardRadius">Chat card corner radius</string>
 </resources>

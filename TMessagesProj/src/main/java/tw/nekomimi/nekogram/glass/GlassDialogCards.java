@@ -1,6 +1,7 @@
 package tw.nekomimi.nekogram.glass;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.AndroidUtilities.dpf2;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -25,23 +26,38 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.DialogCell;
+import org.telegram.ui.Components.RecyclerListView;
+
+import tw.nekomimi.nekogram.NekoConfig;
 
 /**
  * Liquid Glass chat list: every {@link DialogCell} becomes an independent rounded glass card
- * (FlClash dashboard style: 12dp side margin, 6dp gap, ~19dp radius, translucent fill, light rim,
+ * (FlClash dashboard style: 12dp side margin, 3dp gap, user radius (default 24dp), translucent fill, light rim,
  * soft shadow) floating over a soft theme-tinted backdrop. Only installed when {@link NekoGlass#isActive()}.
  */
 public final class GlassDialogCards {
 
     public static final int SIDE_DP = 12;
-    public static final int GAP_HALF_DP = 3;
-    public static final int RADIUS_DP = 19;
+    /** Total gap between two cards (1.5dp above + 1.5dp below each card). */
+    public static final float GAP_DP = 3f;
+    public static final int RADIUS_MIN_DP = 0;
+    public static final int RADIUS_MAX_DP = 32;
+    public static final int RADIUS_DEFAULT_DP = 24;
 
     private GlassDialogCards() {
     }
 
+    /** Card corner radius in dp, from Neko settings → Appearance (0–32, default 24). */
+    public static int radiusDp() {
+        return Math.max(RADIUS_MIN_DP, Math.min(RADIUS_MAX_DP, NekoConfig.glassCardRadius));
+    }
+
     public static float radius() {
-        return dp(RADIUS_DP);
+        return dpf2(radiusDp());
+    }
+
+    public static int radiusPx() {
+        return Math.round(radius());
     }
 
     private static final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -90,15 +106,26 @@ public final class GlassDialogCards {
         public void getItemOffsets(@NonNull Rect outRect, @NonNull View view, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
             if (view instanceof DialogCell) {
                 ((DialogCell) view).glassCard = true;
-                outRect.set(dp(SIDE_DP), dp(GAP_HALF_DP), dp(SIDE_DP), dp(GAP_HALF_DP));
+                final int gap = Math.max(2, Math.round(dpf2(GAP_DP)));
+                final int top = gap / 2;
+                outRect.set(dp(SIDE_DP), top, dp(SIDE_DP), gap - top);
             } else {
                 outRect.setEmpty();
             }
         }
 
+        private int selectorRadius = -1;
+
         @Override
         public void onDraw(@NonNull Canvas c, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
             final float r = radius();
+            if (parent instanceof RecyclerListView && selectorRadius != radiusPx()) {
+                // keep the press highlight's corners in step with the card radius setting
+                selectorRadius = radiusPx();
+                final RecyclerListView list = (RecyclerListView) parent;
+                list.setSelectorRadius(selectorRadius);
+                list.setSelectorDrawableColor(Theme.getColor(Theme.key_listSelector));
+            }
             final int accent = Theme.getColor(Theme.key_chats_actionBackground);
             for (int i = 0, n = parent.getChildCount(); i < n; i++) {
                 final View child = parent.getChildAt(i);

@@ -739,6 +739,17 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
                     blurredBackgroundDrawable.setBounds(AndroidUtilities.rectTmp2);
                     blurredBackgroundDrawable.setAlpha(bgPaint.getAlpha());
                     blurredBackgroundDrawable.draw(canvas);
+                } else if (tw.nekomimi.nekogram.glass.NekoGlass.isActive()) {
+                    // Nekogram Liquid Glass: translucent glass bar with sheen + rim
+                    final int bgAlpha = bgPaint.getAlpha();
+                    final int bgColor = bgPaint.getColor();
+                    bgPaint.setColor(Theme.multAlpha(bgColor | 0xFF000000, 0.86f * bgAlpha / 255f));
+                    canvas.drawRoundRect(rect, radius, radius, bgPaint);
+                    bgPaint.setColor(bgColor);
+                    bgPaint.setAlpha(bgAlpha);
+                    final boolean glassDark = tw.nekomimi.nekogram.glass.NekoGlass.isDark(bgColor | 0xFF000000);
+                    tw.nekomimi.nekogram.glass.NekoGlass.drawSheen(canvas, rect, radius, glassDark, bgAlpha / 255f);
+                    tw.nekomimi.nekogram.glass.NekoGlass.drawRim(canvas, rect, radius, glassDark, bgAlpha / 255f);
                 } else {
                     canvas.drawRoundRect(rect, radius, radius, bgPaint);
                 }

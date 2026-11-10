@@ -147,7 +147,49 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
     private BlurredBackgroundDrawable iBlur3Background;
     private BlurredBackgroundColorProviderThemed iBlur3ColorProviderTabs;
 
+    /** Nekogram Liquid Glass: glass circle (translucent fill, rim, sheen, shadow) with a jelly press. */
+    private boolean glassStyle;
+    private final android.graphics.RectF glassRect = new android.graphics.RectF();
+
+    public void setGlassStyle(boolean glass) {
+        if (glassStyle == glass) {
+            return;
+        }
+        glassStyle = glass;
+        if (glass) {
+            // jelly press: squash to 0.92 and spring back with overshoot
+            ScaleStateListAnimator.apply(this, 0.08f, 3.2f);
+            if (!isSubButton) {
+                setTranslationZ(0);
+                setOutlineProvider(null);
+            }
+        } else {
+            ScaleStateListAnimator.apply(this);
+            if (!isSubButton) {
+                setOutlineProvider(ViewOutlineProviderImpl.BOUNDS_OVAL);
+                setTranslationZ(dpf2(0.5f));
+            }
+        }
+        updateColors();
+    }
+
+    @Override
+    protected void drawableStateChanged() {
+        super.drawableStateChanged();
+        if (glassStyle) {
+            invalidate();
+        }
+    }
+
     public void updateColors() {
+        if (glassStyle) {
+            final int icon = isSubButton ? Theme.getColor(Theme.key_actionBarDefaultIcon, resourcesProvider) : Theme.getColor(Theme.key_chats_actionIcon, resourcesProvider);
+            imageView.setColorFilter(icon, PorterDuff.Mode.SRC_IN);
+            progressView.setProgressColor(icon);
+            setBackground(null);
+            invalidate();
+            return;
+        }
         if (isSubButton) {
             imageView.setColorFilter(Theme.getColor(Theme.key_actionBarDefaultIcon, resourcesProvider), PorterDuff.Mode.SRC_IN);
             progressView.setProgressColor(Theme.getColor(Theme.key_actionBarDefaultIcon, resourcesProvider));
@@ -214,6 +256,22 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
 
     @Override
     public void draw(@NonNull Canvas canvas) {
+        if (glassStyle) {
+            if (isSubButton) {
+                final float inset = dpf2(5.66f);
+                glassRect.set(inset, inset, getWidth() - inset, getHeight() - inset);
+                tw.nekomimi.nekogram.glass.GlassPopup.drawFab(canvas, glassRect,
+                    Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider), 0.62f, isPressed(), true);
+            } else {
+                // leave room inside the bounds for the soft shadow
+                final float inset = dpf2(2f);
+                glassRect.set(inset, inset * 0.6f, getWidth() - inset, getHeight() - inset * 1.4f);
+                tw.nekomimi.nekogram.glass.GlassPopup.drawFab(canvas, glassRect,
+                    Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider), 0.74f, isPressed(), true);
+            }
+            super.draw(canvas);
+            return;
+        }
         if (iBlur3Background != null) {
             iBlur3Background.draw(canvas);
         }

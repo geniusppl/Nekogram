@@ -163,6 +163,8 @@ public class ActionBarPopupWindow extends PopupWindow {
 
             if (resId != 0) {
                 backgroundDrawable = getResources().getDrawable(resId).mutate();
+                // Nekogram Liquid Glass: blurred translucent glass instead of the opaque 9-patch
+                backgroundDrawable = tw.nekomimi.nekogram.glass.GlassPopup.wrapBackground(this, backgroundDrawable);
                 setPadding(dp(8), dp(8), dp(8), dp(8));
             }
             if (backgroundDrawable != null) {
@@ -293,6 +295,10 @@ public class ActionBarPopupWindow extends PopupWindow {
 
         public void setBackgroundColor(int color) {
             if (backgroundColor != color && backgroundDrawable != null) {
+                if (backgroundDrawable instanceof tw.nekomimi.nekogram.glass.GlassPopup.Background) {
+                    ((tw.nekomimi.nekogram.glass.GlassPopup.Background) backgroundDrawable).setColor(backgroundColor = color);
+                    return;
+                }
                 backgroundDrawable.setColorFilter(new PorterDuffColorFilter(backgroundColor = color, PorterDuff.Mode.MULTIPLY));
             }
         }
@@ -835,6 +841,7 @@ public class ActionBarPopupWindow extends PopupWindow {
         try {
             super.showAsDropDown(anchor, xoff, yoff);
             registerListener(anchor);
+            tw.nekomimi.nekogram.glass.GlassPopup.onShow(this, anchor);
         } catch (Exception e) {
             FileLog.e(e);
         }
@@ -1010,6 +1017,7 @@ public class ActionBarPopupWindow extends PopupWindow {
     public void showAtLocation(View parent, int gravity, int x, int y) {
         super.showAtLocation(parent, gravity, x, y);
         unregisterListener();
+        tw.nekomimi.nekogram.glass.GlassPopup.onShow(this, parent);
     }
 
     @Override

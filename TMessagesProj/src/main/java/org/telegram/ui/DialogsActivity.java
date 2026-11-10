@@ -4109,7 +4109,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 // Liquid Glass: each chat row is its own rounded glass card floating over a soft backdrop
                 viewPage.listView.setBackground(new tw.nekomimi.nekogram.glass.GlassDialogCards.Backdrop());
                 viewPage.listView.addItemDecoration(new tw.nekomimi.nekogram.glass.GlassDialogCards.Decoration());
-                viewPage.listView.setSelectorRadius(dp(tw.nekomimi.nekogram.glass.GlassDialogCards.RADIUS_DP));
+                viewPage.listView.setSelectorRadius(tw.nekomimi.nekogram.glass.GlassDialogCards.radiusPx());
                 viewPage.listView.setSelectorDrawableColor(getThemedColor(Theme.key_listSelector));
             }
             viewPage.dialogsItemAnimator = new DialogsItemAnimator(viewPage.listView) {
@@ -4820,6 +4820,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         floatingButton3 = new FragmentFloatingButton(context, resourceProvider);
         contentView.addView(floatingButton3, FragmentFloatingButton.createDefaultLayoutParams());
+        if (tw.nekomimi.nekogram.glass.NekoGlass.isActive()) {
+            floatingButton3.setGlassStyle(true);
+            floatingButtonStories.setGlassStyle(true);
+        }
         floatingButton3.setOnClickListener(v -> {
             if (parentLayout != null && parentLayout.isInPreviewMode()) {
                 finishPreviewFragment();

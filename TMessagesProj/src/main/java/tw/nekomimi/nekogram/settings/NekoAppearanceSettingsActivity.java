@@ -18,6 +18,7 @@ import org.telegram.ui.LaunchActivity;
 import java.util.ArrayList;
 
 import tw.nekomimi.nekogram.NekoConfig;
+import tw.nekomimi.nekogram.glass.GlassDialogCards;
 import tw.nekomimi.nekogram.glass.NekoGlass;
 import tw.nekomimi.nekogram.helpers.EmojiHelper;
 
@@ -42,6 +43,7 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
 
     private final int strokeOnViewsRow = rowId++;
     private final int liquidGlassRow = rowId++;
+    private final int glassCardRadiusRow = rowId++;
 
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
@@ -84,6 +86,23 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
                 .setChecked(NekoConfig.liquidGlass && NekoGlass.isSupported())
                 .setEnabled(NekoGlass.isSupported())
                 .slug("liquidGlass"));
+        if (NekoConfig.liquidGlass && NekoGlass.isSupported()) {
+            items.add(UItem.asShadow(null));
+            items.add(UItem.asHeader(LocaleController.getString(R.string.GlassCardRadius)));
+            final UItem[] holder = new UItem[1];
+            final UItem radius = UItem.asIntSlideView(1,
+                    GlassDialogCards.RADIUS_MIN_DP, GlassDialogCards.radiusDp(), GlassDialogCards.RADIUS_MAX_DP,
+                    val -> val + "dp",
+                    val -> {
+                        NekoConfig.setGlassCardRadius(val);
+                        if (holder[0] != null) {
+                            holder[0].intValue = val;
+                        }
+                    });
+            holder[0] = radius;
+            radius.id = glassCardRadiusRow;
+            items.add(radius.slug("glassCardRadius"));
+        }
         items.add(UItem.asShadow(null));
 
     }
@@ -188,6 +207,7 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
             if (view instanceof TextCheckCell) {
                 ((TextCheckCell) view).setChecked(NekoConfig.liquidGlass);
             }
+            listView.adapter.update(true);
             parentLayout.rebuildAllFragmentViews(false, false);
             showRestartBulletin();
         } else if (id == strokeOnViewsRow) {

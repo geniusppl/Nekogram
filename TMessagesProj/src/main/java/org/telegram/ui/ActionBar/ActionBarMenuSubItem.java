@@ -458,6 +458,10 @@ public class ActionBarMenuSubItem extends FrameLayout {
     }
 
     public void updateBackground() {
+        if (tw.nekomimi.nekogram.glass.NekoGlass.isActive()) {
+            setBackground(tw.nekomimi.nekogram.glass.GlassPopup.createItemSelector(selectorColor));
+            return;
+        }
         setBackground(Theme.createRadSelectorDrawable(selectorColor, top ? selectorRad : 0, bottom ? selectorRad : 0));
     }
 
