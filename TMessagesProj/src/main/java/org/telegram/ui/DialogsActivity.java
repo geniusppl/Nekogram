@@ -2007,7 +2007,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                             canvas.save();
                         }
                         canvas.translate(view.getX(), view.getY());
-                        canvas.drawRect(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight(), paint);
+                        if (view instanceof DialogCell && ((DialogCell) view).glassCard) {
+                            rectF.set(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+                            final float gr = tw.nekomimi.nekogram.glass.GlassDialogCards.radius();
+                            paint.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                            canvas.drawRoundRect(rectF, gr, gr, paint);
+                            tw.nekomimi.nekogram.glass.GlassDialogCards.drawCard(canvas, rectF, gr, 1f, 0);
+                        } else {
+                            canvas.drawRect(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight(), paint);
+                        }
                         view.draw(canvas);
                         canvas.restore();
                     }
@@ -4097,6 +4105,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             viewPage.listView.setPivotY(0);
             if (initialDialogsType == DIALOGS_TYPE_BOT_REQUEST_PEER) {
                 viewPage.listView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+            } else if (tw.nekomimi.nekogram.glass.NekoGlass.isActive()) {
+                // Liquid Glass: each chat row is its own rounded glass card floating over a soft backdrop
+                viewPage.listView.setBackground(new tw.nekomimi.nekogram.glass.GlassDialogCards.Backdrop());
+                viewPage.listView.addItemDecoration(new tw.nekomimi.nekogram.glass.GlassDialogCards.Decoration());
+                viewPage.listView.setSelectorRadius(dp(tw.nekomimi.nekogram.glass.GlassDialogCards.RADIUS_DP));
+                viewPage.listView.setSelectorDrawableColor(getThemedColor(Theme.key_listSelector));
             }
             viewPage.dialogsItemAnimator = new DialogsItemAnimator(viewPage.listView) {
                 @Override

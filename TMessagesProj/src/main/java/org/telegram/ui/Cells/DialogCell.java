@@ -529,6 +529,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     public boolean useForceThreeLines;
     public boolean useSeparator;
+    /** Set by GlassDialogCards.Decoration: this cell is drawn as an independent liquid glass card. */
+    public boolean glassCard;
+    private Path glassClipPath;
+    private float glassDrawnTx, glassDrawnTop;
+    private boolean glassDrawnChecked;
     public boolean fullSeparator;
     public boolean fullSeparator2;
 
@@ -3811,6 +3816,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
         }
         invalidate();
+        if (glassCard && getParent() instanceof View) {
+            ((View) getParent()).invalidate();
+        }
     }
 
     public boolean isDrawArchive() {
@@ -3819,6 +3827,53 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     private GradientDrawable archiveFadeGradientDrawable;
     private int archiveFadeGradientDrawableColor;
+
+    /** Top of the visible part of the card (hidden archive being pulled), 0 normally. */
+    public float getGlassClipTop() {
+        final boolean archiveCell = drawArchive && (currentDialogFolderId != 0 || isTopic && forumTopic != null && forumTopic.id == 1) && archivedChatsDrawable != null && translationX == 0.0f;
+        if (archiveCell) {
+            final boolean clip = archivedChatsDrawable.outProgress == 0.0f || parentFragment != null && parentFragment.hasHiddenArchive()
+                && (parentFragment.rightSlidingDialogContainer == null || !parentFragment.rightSlidingDialogContainer.hasFragment());
+            if (clip) {
+                return getMeasuredHeight() * (1f - archivedChatsDrawable.getPullProgress());
+            }
+        }
+        return 0;
+    }
+
+    public boolean isGlassChecked() {
+        return checkBox != null && checkBox.isChecked();
+    }
+
+    @Override
+    public void draw(Canvas canvas) {
+        if (!glassCard || getMeasuredWidth() <= 0) {
+            super.draw(canvas);
+            return;
+        }
+        // the card itself is painted by the list's item decoration: keep it in sync with what moves it
+        final float cardTx = translationX, cardTop = getGlassClipTop();
+        final boolean cardChecked = isGlassChecked();
+        if (cardTx != glassDrawnTx || cardTop != glassDrawnTop || cardChecked != glassDrawnChecked) {
+            glassDrawnTx = cardTx;
+            glassDrawnTop = cardTop;
+            glassDrawnChecked = cardChecked;
+            if (getParent() instanceof View) {
+                ((View) getParent()).invalidate();
+            }
+        }
+        if (glassClipPath == null) {
+            glassClipPath = new Path();
+        }
+        final float r = tw.nekomimi.nekogram.glass.GlassDialogCards.radius();
+        glassClipPath.rewind();
+        AndroidUtilities.rectTmp.set(0, 0, getMeasuredWidth(), getMeasuredHeight());
+        glassClipPath.addRoundRect(AndroidUtilities.rectTmp, r, r, Path.Direction.CW);
+        canvas.save();
+        canvas.clipPath(glassClipPath);
+        super.draw(canvas);
+        canvas.restore();
+    }
 
     @SuppressLint("DrawAllocation")
     @Override
@@ -3956,9 +4011,17 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
 
             float tx = getMeasuredWidth() + translationX;
+            // glass: the action sits on its own rounded card, separated from the sliding chat card by a gap
+            final float revealLeft = glassCard ? Math.min(getMeasuredWidth(), tx + dp(6)) : tx - dp(8);
+            final float revealR = glassCard ? tw.nekomimi.nekogram.glass.GlassDialogCards.radius() : 0;
             if (currentRevealProgress < 1.0f) {
                 Theme.dialogs_pinnedPaint.setColor(backgroundColor);
-                canvas.drawRect(tx - dp(8), 0, getMeasuredWidth(), getMeasuredHeight(), Theme.dialogs_pinnedPaint);
+                if (glassCard) {
+                    rect.set(revealLeft, 0, getMeasuredWidth(), getMeasuredHeight());
+                    canvas.drawRoundRect(rect, revealR, revealR, Theme.dialogs_pinnedPaint);
+                } else {
+                    canvas.drawRect(tx - dp(8), 0, getMeasuredWidth(), getMeasuredHeight(), Theme.dialogs_pinnedPaint);
+                }
                 if (currentRevealProgress == 0) {
                     if (Theme.dialogs_archiveDrawableRecolored) {
                         Theme.dialogs_archiveDrawable.setLayerColor("Arrow", Theme.getNonAnimatedColor(Theme.key_chats_archiveBackground));
@@ -3981,7 +4044,17 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
             if (currentRevealProgress > 0.0f) {
                 canvas.save();
-                canvas.clipRect(tx - dp(8), 0, getMeasuredWidth(), getMeasuredHeight());
+                if (glassCard) {
+                    if (glassClipPath == null) {
+                        glassClipPath = new Path();
+                    }
+                    glassClipPath.rewind();
+                    rect.set(revealLeft, 0, getMeasuredWidth(), getMeasuredHeight());
+                    glassClipPath.addRoundRect(rect, revealR, revealR, Path.Direction.CW);
+                    canvas.clipPath(glassClipPath);
+                } else {
+                    canvas.clipRect(tx - dp(8), 0, getMeasuredWidth(), getMeasuredHeight());
+                }
                 Theme.dialogs_pinnedPaint.setColor(revealBackgroundColor);
 
                 float rad = (float) Math.sqrt(drawableCx * drawableCx + (drawableCy - getMeasuredHeight()) * (drawableCy - getMeasuredHeight()));
@@ -4048,7 +4121,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             gtx += translationX;
         }
 
-        float cornersRadius = dp(8) * cornerProgress;
+        float cornersRadius = glassCard ? tw.nekomimi.nekogram.glass.GlassDialogCards.radius() : dp(8) * cornerProgress;
         if (isSelected) {
             rect.set(0, 0, getMeasuredWidth(), AndroidUtilities.lerp(getMeasuredHeight(), getCollapsedHeight(), rightFragmentOpenedProgress));
             rect.offset(0, -translateY + collapseOffset);
@@ -4090,7 +4163,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 gtx += -(getMeasuredWidth() - dp(74)) * 0.7f * rightFragmentOpenedProgress;
             }
 
-            if (translationX != 0 || cornerProgress != 0.0f) {
+            if (!glassCard && (translationX != 0 || cornerProgress != 0.0f)) {
                 canvas.save();
 
                 Theme.dialogs_pinnedPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider));
@@ -4844,7 +4917,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             canvas.restore();
         }
 
-        if (useSeparator) {
+        if (useSeparator && !glassCard) {
             int left;
             if (fullSeparator || currentDialogFolderId != 0 && archiveHidden && !fullSeparator2 || fullSeparator2 && !archiveHidden) {
                 left = 0;
