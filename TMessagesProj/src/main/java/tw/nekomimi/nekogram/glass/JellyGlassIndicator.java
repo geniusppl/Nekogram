@@ -26,6 +26,10 @@ public class JellyGlassIndicator {
     public static final float JELLY_ASPECT = 1.4f;
     public static final float OVERDRAG = 0.35f;
     public static final float PULL_STRETCH = 0.5f;
+    public static final float LIFT_SNAP = 0.975f;    // _liftSnap
+    public static final float LIFT_RELEASE = 0.04f;  // _liftRelease, in destinations
+    public static final float PRESS_GROWTH = 1f / 8f; // ElasticPress _pressGrowth
+    public static final float MAX_PRESS_GROWTH_DP = 16f; // _maxPressGrowth
 
     // springs (stiffness, damping)
     private static final float FOLLOW_K = 1024f, FOLLOW_C = 2f * 0.9f * 32f;          // ratio 0.9
@@ -48,6 +52,8 @@ public class JellyGlassIndicator {
     private float jelly, vJelly;
     private float lift, vLift, liftTarget;
     private float pull, vPull, pullTarget;
+    private float swell, vSwell, swellTarget;
+    private boolean dropping;
     private int mode = MODE_TRAVEL;
     private float pitch = dp(64);
     private long lastFrameTime;
@@ -101,12 +107,29 @@ public class JellyGlassIndicator {
         }
     }
 
+    /**
+     * prism_ui FloatingNavigationBar: a press lifts the lens (_liftSpring) and swells the bar
+     * (_pressSpring); on release the bar settles at once while the lens stays lifted until it
+     * has risen all the way and arrived (_dropLift).
+     */
     public void setPressed(boolean pressed) {
-        final float t = pressed ? 1f : 0f;
-        if (liftTarget != t) {
-            liftTarget = t;
-            host.invalidate();
+        if (pressed) {
+            dropping = false;
+            liftTarget = 1f;
+            swellTarget = 1f;
+        } else {
+            dropping = liftTarget > 0f;
+            swellTarget = 0f;
         }
+        host.invalidate();
+    }
+
+    public float getSwell() {
+        return swell;
+    }
+
+    public float getPull() {
+        return pull;
     }
 
     public float getLift() {
@@ -163,8 +186,14 @@ public class JellyGlassIndicator {
             k = TRAVEL_K;
             c = TRAVEL_C;
         }
-        final float liftK = liftTarget > lift ? PRESS_K : LIFT_K;
-        final float liftC = liftTarget > lift ? PRESS_C : LIFT_C;
+        if (dropping && lift >= LIFT_SNAP && Math.abs(targetX - x) <= LIFT_RELEASE * pitch) {
+            dropping = false;
+            liftTarget = 0f;
+        }
+        final float liftK = LIFT_K;
+        final float liftC = LIFT_C;
+        final float pullK = pullTarget == 0f ? PRESS_K : TRACK_K;
+        final float pullC = pullTarget == 0f ? PRESS_C : TRACK_C;
 
         final int steps = Math.max(1, (int) Math.ceil(dt / (1f / 240f)));
         final float h = dt / steps;
@@ -190,16 +219,22 @@ public class JellyGlassIndicator {
             vLift += al * h;
             lift += vLift * h;
 
-            final float ap = TRACK_K * (pullTarget - pull) - TRACK_C * vPull;
+            final float ap = pullK * (pullTarget - pull) - pullC * vPull;
             vPull += ap * h;
             pull += vPull * h;
+
+            final float as = PRESS_K * (swellTarget - swell) - PRESS_C * vSwell;
+            vSwell += as * h;
+            swell += vSwell * h;
         }
 
         final boolean moving = Math.abs(targetX - x) > 0.3f || Math.abs(vx) > 2f
             || Math.abs(targetW - w) > 0.3f || Math.abs(vw) > 2f
             || Math.abs(jelly) > 0.003f || Math.abs(vJelly) > 0.01f
             || Math.abs(liftTarget - lift) > 0.002f || Math.abs(vLift) > 0.01f
-            || Math.abs(pullTarget - pull) > 0.3f || Math.abs(vPull) > 2f;
+            || Math.abs(pullTarget - pull) > 0.3f || Math.abs(vPull) > 2f
+            || Math.abs(swellTarget - swell) > 0.002f || Math.abs(vSwell) > 0.01f
+            || dropping;
         if (moving) {
             host.postInvalidateOnAnimation();
         } else {
@@ -211,6 +246,8 @@ public class JellyGlassIndicator {
             vLift = 0;
             pull = pullTarget;
             vPull = 0;
+            swell = swellTarget;
+            vSwell = 0;
             lastFrameTime = 0;
         }
         return moving;
@@ -218,15 +255,14 @@ public class JellyGlassIndicator {
 
     /**
      * prism_ui _lensRect: the lens grows by {@code growthPx} on each side when lifted,
-     * widens with jelly, flattens by jelly * aspect, and stretches toward a pull.
+     * widens with jelly and flattens by jelly * aspect. (A pull past the ends stretches the
+     * whole bar, see _PressTransform, which the host applies to itself.)
      */
     public void getRect(RectF out, float centerY, float height, float growthPx) {
         final float growth = growthPx * 2f * lift;
         final float baseW = Math.max(0, w);
-        final float pullStretch = baseW > 0 ? Math.abs(pull) / baseW * PULL_STRETCH : 0f;
-        final float lensW = (baseW + growth) * (1f + jelly) * (1f + pullStretch);
-        final float lensH = (height + growth) * Math.max(0.5f, 1f - jelly * JELLY_ASPECT) / (1f + pullStretch * 0.5f);
-        final float cx = x + pull * 0.5f;
-        out.set(cx - lensW / 2f, centerY - lensH / 2f, cx + lensW / 2f, centerY + lensH / 2f);
+        final float lensW = (baseW + growth) * (1f + jelly);
+        final float lensH = (height + growth) * Math.max(0.5f, 1f - jelly * JELLY_ASPECT);
+        out.set(x - lensW / 2f, centerY - lensH / 2f, x + lensW / 2f, centerY + lensH / 2f);
     }
 }

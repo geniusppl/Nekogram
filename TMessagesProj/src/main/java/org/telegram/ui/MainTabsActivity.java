@@ -371,6 +371,15 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewBackground.setRadius(dp(DialogsActivity.MAIN_TABS_HEIGHT / 2f));
         tabsViewBackground.setPadding(dp(DialogsActivity.MAIN_TABS_MARGIN - 0.334f));
         tabsView.setBackground(tabsViewBackground);
+        if (tabsView.hasJelly()) {
+            // Neko Liquid Glass: the clear lens (FlClash) bends the bar's backdrop over the whole tabs view
+            iBlur3FactoryGlass.setLiquidGlassEffectAllowed(false);
+            final BlurredBackgroundDrawable lensBackdrop = iBlur3FactoryGlass.create(tabsView, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
+            lensBackdrop.setRadius(0);
+            lensBackdrop.setPadding(0);
+            tabsView.setLensBackdrop(lensBackdrop);
+            iBlur3FactoryGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+        }
 
         BlurredBackgroundDrawableViewFactory iBlur3FactoryFade = new BlurredBackgroundDrawableViewFactory(iBlur3SourceColor);
         iBlur3FactoryFade.setSourceRootView(viewPositionWatcher, contentView);
@@ -1222,6 +1231,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         blur3_updateFadeColors();
         if (tabsViewBackground != null) {
             tabsViewBackground.updateColors();
+            if (tabsView != null && tabsView.getLensBackdrop() instanceof BlurredBackgroundDrawable) {
+                ((BlurredBackgroundDrawable) tabsView.getLensBackdrop()).updateColors();
+            }
         }
         blur3_invalidateBlur();
         if (fadeView != null) {

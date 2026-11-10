@@ -9,6 +9,8 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.SystemClock;
 import android.view.HapticFeedbackConstants;
 import android.view.ViewConfiguration;
@@ -31,6 +33,7 @@ import org.telegram.ui.Components.AnimatedLinearLayout;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.glass.GlassTabView;
 
+import tw.nekomimi.nekogram.glass.FlClashLens;
 import tw.nekomimi.nekogram.glass.JellyGlassIndicator;
 import tw.nekomimi.nekogram.glass.NekoGlass;
 
@@ -445,6 +448,9 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     }
 
     private final BoolAnimator animatorIsScaled = new BoolAnimator(0, (a, factor, c, g) -> {
+        if (jelly != null) {
+            return;
+        }
         setScaleX(lerp(1, 1.019f, factor));
         setScaleY(lerp(1, 1.019f, factor));
     }, CubicBezierInterpolator.EASE_OUT_QUINT, 380);
@@ -561,6 +567,9 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     }
 
     private void checkLayerType() {
+        if (jelly != null) {
+            return;
+        }
         final int layerType = Math.abs(getScaleX() - 1f) < 0.0001f && Math.abs(getScaleY() - 1f) < 0.0001f ?
             View.LAYER_TYPE_NONE : View.LAYER_TYPE_HARDWARE;
 
@@ -572,6 +581,9 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
 
     private void checkPivot(View view, float x, float y) {
+        if (jelly != null) {
+            return;
+        }
         float w = view.getWidth();
         float h = view.getHeight();
 
@@ -743,6 +755,10 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     // ---------------------------------------------------------------------------------------
 
     private final JellyGlassIndicator jelly = NekoGlass.isActive() ? new JellyGlassIndicator(this) : null;
+    // FlClash's clear glass lens (prism_ui _GlassLens + _LensContent), API 33+
+    private final Object flclashLens = jelly != null && Build.VERSION.SDK_INT >= 33 ? FlClashLens.create() : null;
+    private Drawable lensBackdrop;
+    private boolean jellyPressed;
     private final RectF jellyRect = new RectF();
     private final Path jellyPath = new Path();
     private boolean jellyDragging;
@@ -757,6 +773,26 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
     public boolean hasJelly() {
         return jelly != null;
+    }
+
+    /**
+     * What the lens bends: the bar's blurred backdrop over the whole view (and past it), so the
+     * part of the lens that rises above the bar still has something under it.
+     */
+    public void setLensBackdrop(Drawable backdrop) {
+        lensBackdrop = backdrop;
+        if (backdrop != null) {
+            backdrop.setCallback(this);
+        }
+    }
+
+    public Drawable getLensBackdrop() {
+        return lensBackdrop;
+    }
+
+    @Override
+    protected boolean verifyDrawable(@NonNull Drawable who) {
+        return who == lensBackdrop || super.verifyDrawable(who);
     }
 
     /** Center x of the pager position under the finger, or NaN when the pager is not dragged. */
@@ -801,6 +837,9 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         if (jellyDragging) {
             targetX = jellyDragX;
             mode = JellyGlassIndicator.MODE_FOLLOW;
+        } else if (jellyPressed && !isInLongPress && findNearestVisibleChildByX(clampXToChildrenCenters(jellyDownX, this), this) != null) {
+            targetX = getCenterX(findNearestVisibleChildByX(clampXToChildrenCenters(jellyDownX, this), this));
+            mode = JellyGlassIndicator.MODE_TRAVEL;
         } else if (isInLongPress) {
             targetX = animatedLongSelectedViewCenterX + animatedLongSelectedViewOffsetX;
             mode = JellyGlassIndicator.MODE_FOLLOW;
@@ -829,14 +868,26 @@ public class MainTabsLayout extends AnimatedLinearLayout {
         jelly.setPitch(jellyPitch());
         jelly.setTarget(targetX, targetW, mode);
         jelly.step();
-        jelly.getRect(jellyRect, getPaddingTop() + height / 2f, height, dp(3));
+        applyJellyPress();
+        jelly.getRect(jellyRect, getPaddingTop() + height / 2f, height, dp(FlClashLens.LENS_GROWTH_DP));
+        if (jellyRect.height() > getHeight()) {
+            jellyRect.inset(0, (jellyRect.height() - getHeight()) / 2f);
+        }
         final float r = jellyRect.height() / 2f;
         final float lift = jelly.getLift();
+        final int accent = Theme.getColor(Theme.key_glass_tabSelected, resourcesProvider);
 
-        NekoGlass.drawPill(canvas, jellyRect, r, Theme.getColor(Theme.key_glass_tabSelected, resourcesProvider), lift, 1f);
+        // prism_ui _Lens: on glass the selection rests as a tinted platter and clears as it lifts
+        if (lift < 1f) {
+            NekoGlass.drawPill(canvas, jellyRect, r, accent, 0f, 1f - Math.max(0f, lift));
+        }
+
+        if (lift > 0.004f && Build.VERSION.SDK_INT >= 33 && flclashLens != null && drawFlClashLens(canvas, r, lift, accent)) {
+            return true;
+        }
 
         if (lift > 0.02f) {
-            // the lifted lens magnifies what is under it (prism_ui _lensMagnify = 0.16)
+            // fallback: the lifted lens magnifies what is under it (prism_ui _lensMagnify = 0.16)
             jellyPath.rewind();
             jellyPath.addRoundRect(jellyRect, r, r, Path.Direction.CW);
             canvas.save();
@@ -851,6 +902,83 @@ public class MainTabsLayout extends AnimatedLinearLayout {
             canvas.restore();
         } else {
             super.dispatchDraw(canvas);
+        }
+        return true;
+    }
+
+    /**
+     * prism_ui _PressTransform: a press swells the bar by min(2 * 1/8, 16dp / longest side) and a
+     * pull past either end stretches it along x by pull / width * 0.5 and moves it with the pull.
+     */
+    private void applyJellyPress() {
+        final float panelW = Math.max(1f, getWidth() - dp(DialogsActivity.MAIN_TABS_MARGIN) * 2f);
+        final float growth = Math.min(JellyGlassIndicator.PRESS_GROWTH * 2f, dp(JellyGlassIndicator.MAX_PRESS_GROWTH_DP) / panelW);
+        final float swell = 1f + jelly.getSwell() * growth;
+        final float pull = jelly.getPull();
+        final float sx = swell * (1f + Math.abs(pull) / panelW * JellyGlassIndicator.PULL_STRETCH);
+        setPivotX(getWidth() / 2f);
+        setPivotY(getHeight() / 2f);
+        if (Math.abs(getScaleX() - sx) > 1e-4f) {
+            setScaleX(sx);
+        }
+        if (Math.abs(getScaleY() - swell) > 1e-4f) {
+            setScaleY(swell);
+        }
+        if (Math.abs(getTranslationX() - pull) > 0.05f) {
+            setTranslationX(pull);
+        }
+    }
+
+    private final FlClashLens.ContentPainter lensContentPainter = this::drawTabsMagnified;
+
+    /** _LensTint: every destination scaled about its own center, as the lens magnifies it. */
+    private void drawTabsMagnified(Canvas canvas, float magnify) {
+        final long time = getDrawingTime();
+        for (int i = 0, N = getChildCount(); i < N; i++) {
+            final View child = getChildAt(i);
+            if (child.getVisibility() != View.VISIBLE || child.getWidth() <= 0) {
+                continue;
+            }
+            canvas.save();
+            canvas.scale(magnify, magnify, child.getX() + child.getWidth() / 2f, child.getY() + child.getHeight() / 2f);
+            drawChild(canvas, child, time);
+            canvas.restore();
+        }
+    }
+
+    @androidx.annotation.RequiresApi(api = 33)
+    private boolean drawFlClashLens(Canvas canvas, float r, float lift, int accent) {
+        final FlClashLens lens = (FlClashLens) flclashLens;
+        if (lens.isFailed() || !canvas.isHardwareAccelerated()) {
+            return false;
+        }
+        final Drawable backdrop = lensBackdrop != null ? lensBackdrop : getBackground();
+        if (backdrop == null) {
+            return false;
+        }
+        final boolean dark = Theme.isCurrentThemeDark();
+        final int w = getWidth(), h = getHeight();
+        final int out = lensBackdrop != null ? dp(24) : 0;
+        // _lensShadows under the clear lens, then the lens bending the bar (_GlassLens)
+        lens.drawShadow(canvas, jellyRect, lift, dark);
+        if (!lens.drawGlass(canvas, w, h, jellyRect, r, lift, dark, backdrop, -out, -out, w + out, h + out)) {
+            return false;
+        }
+        // destinations outside the lens as they are
+        jellyPath.rewind();
+        jellyPath.addRoundRect(jellyRect, r, r, Path.Direction.CW);
+        canvas.save();
+        canvas.clipOutPath(jellyPath);
+        super.dispatchDraw(canvas);
+        canvas.restore();
+        // and inside it magnified, tinted and warped by a pane of their own (_LensContent)
+        if (!lens.drawContent(canvas, w, h, jellyRect, r, lift, dark, accent, lensContentPainter)) {
+            canvas.save();
+            canvas.clipPath(jellyPath);
+            final float s = 1f + FlClashLens.LENS_MAGNIFY * lift;
+            canvas.scale(s, s, jellyRect.centerX(), jellyRect.centerY());
+            super.dispatchDraw(canvas);
+            canvas.restore();
         }
         return true;
     }
@@ -894,6 +1022,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
             case MotionEvent.ACTION_DOWN:
                 jellyDragging = false;
                 jellyDownX = ev.getX();
+                jellyPressed = true;
                 jelly.setPressed(true);
                 invalidate();
                 return false;
@@ -918,6 +1047,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                jellyPressed = false;
                 jelly.setPressed(false);
                 invalidate();
                 if (!jellyDragging) {
