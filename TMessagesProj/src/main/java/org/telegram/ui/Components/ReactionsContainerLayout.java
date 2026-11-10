@@ -743,7 +743,7 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
                     // Nekogram Liquid Glass: translucent glass bar with sheen + rim
                     final int bgAlpha = bgPaint.getAlpha();
                     final int bgColor = bgPaint.getColor();
-                    bgPaint.setColor(Theme.multAlpha(bgColor | 0xFF000000, 0.86f * bgAlpha / 255f));
+                    bgPaint.setColor(Theme.multAlpha(bgColor | 0xFF000000, tw.nekomimi.nekogram.glass.NekoGlass.fillAlpha(0.86f) * bgAlpha / 255f));
                     canvas.drawRoundRect(rect, radius, radius, bgPaint);
                     bgPaint.setColor(bgColor);
                     bgPaint.setAlpha(bgAlpha);

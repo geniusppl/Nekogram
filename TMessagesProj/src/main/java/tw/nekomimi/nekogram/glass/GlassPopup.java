@@ -146,7 +146,7 @@ public final class GlassPopup {
                 blurred = true;
             }
             fillPaint.setShader(null);
-            fillPaint.setColor(Theme.multAlpha(base, (blurred ? (dark ? 0.62f : 0.66f) : 0.92f) * a));
+            fillPaint.setColor(Theme.multAlpha(base, NekoGlass.fillAlpha(blurred ? (dark ? 0.62f : 0.66f) : 0.92f) * a));
             canvas.drawRoundRect(rect, r, r, fillPaint);
             NekoGlass.drawSheen(canvas, rect, r, dark, a);
             NekoGlass.drawRim(canvas, rect, r, dark, a);
@@ -353,7 +353,7 @@ public final class GlassPopup {
             canvas.drawRoundRect(rect, r, r, fabShadow);
             canvas.restore();
         }
-        fabFill.setColor(Theme.multAlpha(fillColor | 0xFF000000, fillAlpha));
+        fabFill.setColor(Theme.multAlpha(fillColor | 0xFF000000, NekoGlass.fillAlpha(fillAlpha)));
         canvas.drawRoundRect(rect, r, r, fabFill);
         if (pressed) {
             fabFill.setColor(Color.argb(dark ? 0x22 : 0x38, 255, 255, 255));

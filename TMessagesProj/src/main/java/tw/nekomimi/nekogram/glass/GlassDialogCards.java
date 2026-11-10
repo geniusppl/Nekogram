@@ -89,7 +89,7 @@ public final class GlassDialogCards {
         canvas.restore();
 
         fillPaint.setShader(null);
-        fillPaint.setColor(Theme.multAlpha(base | 0xFF000000, (dark ? 0.56f : 0.64f) * a));
+        fillPaint.setColor(Theme.multAlpha(base | 0xFF000000, NekoGlass.fillAlpha(dark ? 0.56f : 0.64f) * a));
         canvas.drawRoundRect(rect, radius, radius, fillPaint);
         if (tint != 0) {
             fillPaint.setColor(Theme.multAlpha(tint, a));

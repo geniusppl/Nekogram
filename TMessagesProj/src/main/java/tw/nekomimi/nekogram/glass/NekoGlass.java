@@ -46,6 +46,18 @@ public final class NekoGlass {
         return Build.VERSION.SDK_INT >= 33 && NekoConfig.liquidGlass;
     }
 
+    /**
+     * "Glass transparency" setting (0–100%, default 50 = the original look). Maps a surface's
+     * designed fill alpha: 0% → fully opaque, 50% → {@code base}, 100% → no fill (rim/sheen stay).
+     */
+    public static float fillAlpha(float base) {
+        final float t = Math.max(0, Math.min(100, NekoConfig.glassTransparency)) / 100f;
+        if (t <= 0.5f) {
+            return 1f + (base - 1f) * (t / 0.5f);
+        }
+        return base * (1f - (t - 0.5f) / 0.5f);
+    }
+
     public static boolean isDark(int backgroundColor) {
         return AndroidUtilities.computePerceivedBrightness(backgroundColor) < 0.721f;
     }
@@ -118,7 +130,7 @@ public final class NekoGlass {
                     s.setFloatUniform("thickness", dp(11));
                     s.setFloatUniform("refract_intensity", 1f);
                     s.setFloatUniform("refract_index", 1.5f);
-                    final float a = Color.alpha(tintColor) / 255f;
+                    final float a = fillAlpha(Color.alpha(tintColor) / 255f);
                     s.setFloatUniform("foreground_color_premultiplied",
                         Color.red(tintColor) / 255f * a,
                         Color.green(tintColor) / 255f * a,
@@ -135,7 +147,7 @@ public final class NekoGlass {
                 }
             }
             fallbackPaint.setColor(tintColor);
-            fallbackPaint.setAlpha((int) (Color.alpha(tintColor) * Math.min(1f, alpha)));
+            fallbackPaint.setAlpha((int) (255 * fillAlpha(Color.alpha(tintColor) / 255f) * Math.min(1f, alpha)));
             canvas.drawRoundRect(rect, radius, radius, fallbackPaint);
             drawRim(canvas, rect, radius, dark, alpha);
         }

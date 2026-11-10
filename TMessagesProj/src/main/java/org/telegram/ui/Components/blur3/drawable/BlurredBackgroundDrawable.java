@@ -225,8 +225,12 @@ public abstract class BlurredBackgroundDrawable extends Drawable {
         backgroundColor = colorProvider.getBackgroundColor();
         // Nekogram Liquid Glass: themed glass tints are often fully opaque, which paints a solid
         // panel and hides the glass; cap the tint so the refracted backdrop shows (KunBox-like).
-        if (tw.nekomimi.nekogram.glass.NekoGlass.isActive() && android.graphics.Color.alpha(backgroundColor) > 0x73) {
-            backgroundColor = (backgroundColor & 0x00FFFFFF) | (0x73 << 24);
+        if (tw.nekomimi.nekogram.glass.NekoGlass.isActive()) {
+            // cap follows the "Glass transparency" setting (default 50% = 0x73)
+            final int cap = Math.round(255 * tw.nekomimi.nekogram.glass.NekoGlass.fillAlpha(0x73 / 255f));
+            if (android.graphics.Color.alpha(backgroundColor) > cap) {
+                backgroundColor = (backgroundColor & 0x00FFFFFF) | (cap << 24);
+            }
         }
         shadowColor = colorProvider.getShadowColor();
         strokeColorTop = colorProvider.getStrokeColorTop();

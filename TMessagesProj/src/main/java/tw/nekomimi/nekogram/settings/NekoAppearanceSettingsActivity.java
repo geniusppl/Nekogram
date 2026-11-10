@@ -44,6 +44,10 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
     private final int strokeOnViewsRow = rowId++;
     private final int liquidGlassRow = rowId++;
     private final int glassCardRadiusRow = rowId++;
+    private final int glassPreviewRow = rowId++;
+    private final int glassTransparencyRow = rowId++;
+
+    private GlassPreviewCell glassPreview;
 
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
@@ -88,8 +92,14 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
                 .slug("liquidGlass"));
         if (NekoConfig.liquidGlass && NekoGlass.isSupported()) {
             items.add(UItem.asShadow(null));
+            if (glassPreview == null && getContext() != null) {
+                glassPreview = new GlassPreviewCell(getContext());
+            }
+            if (glassPreview != null) {
+                items.add(UItem.asCustom(glassPreviewRow, glassPreview));
+            }
             items.add(UItem.asHeader(LocaleController.getString(R.string.GlassCardRadius)));
-            final UItem[] holder = new UItem[1];
+            final UItem[] holder = new UItem[2];
             final UItem radius = UItem.asIntSlideView(1,
                     GlassDialogCards.RADIUS_MIN_DP, GlassDialogCards.radiusDp(), GlassDialogCards.RADIUS_MAX_DP,
                     val -> val + "dp",
@@ -98,10 +108,29 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
                         if (holder[0] != null) {
                             holder[0].intValue = val;
                         }
+                        if (glassPreview != null) {
+                            glassPreview.invalidate();
+                        }
                     });
             holder[0] = radius;
             radius.id = glassCardRadiusRow;
             items.add(radius.slug("glassCardRadius"));
+            items.add(UItem.asHeader(LocaleController.getString(R.string.GlassTransparency)));
+            final UItem transparency = UItem.asIntSlideView(1,
+                    0, Math.max(0, Math.min(100, NekoConfig.glassTransparency)), 100,
+                    val -> val + "%",
+                    val -> {
+                        NekoConfig.setGlassTransparency(val);
+                        if (holder[1] != null) {
+                            holder[1].intValue = val;
+                        }
+                        if (glassPreview != null) {
+                            glassPreview.invalidate();
+                        }
+                    });
+            holder[1] = transparency;
+            transparency.id = glassTransparencyRow;
+            items.add(transparency.slug("glassTransparency"));
         }
         items.add(UItem.asShadow(null));
 

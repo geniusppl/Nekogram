@@ -139,6 +139,7 @@ public class NekoConfig {
     public static boolean strokeOnViews = true;
     public static boolean liquidGlass = false;
     public static int glassCardRadius = 24;
+    public static int glassTransparency = 50;
     public static boolean tryToOpenAllLinksInIV = false;
     public static boolean unmuteVideosWithVolumeButtons = true;
     public static boolean useSystemEmoji = false;
@@ -248,6 +249,7 @@ public class NekoConfig {
             strokeOnViews = preferences.getBoolean("strokeOnViews", true);
             liquidGlass = preferences.getBoolean("nekoLiquidGlass", false);
             glassCardRadius = preferences.getInt("nekoGlassCardRadius", 24);
+            glassTransparency = preferences.getInt("nekoGlassTransparency", 50);
             tryToOpenAllLinksInIV = preferences.getBoolean("tryToOpenAllLinksInIV", false);
             unmuteVideosWithVolumeButtons = preferences.getBoolean("unmuteVideosWithVolumeButtons", true);
             useSystemEmoji = preferences.getBoolean("useSystemEmoji", false);
@@ -1143,6 +1145,11 @@ public class NekoConfig {
     public static void setGlassCardRadius(int value) {
         glassCardRadius = value;
         preferences.edit().putInt("nekoGlassCardRadius", value).apply();
+    }
+
+    public static void setGlassTransparency(int value) {
+        glassTransparency = value;
+        preferences.edit().putInt("nekoGlassTransparency", value).apply();
     }
 
     public static void toggleStrokeOnViews() {

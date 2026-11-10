@@ -351,4 +351,5 @@
     <string name="LiquidGlassInfo">为标题栏、标签栏、菜单、弹窗和消息气泡加入透镜折射、模糊与高光，会更耗 GPU</string>
     <string name="LiquidGlassRequires13">需要 Android 13+</string>
     <string name="GlassCardRadius">聊天卡片圆角</string>
+    <string name="GlassTransparency">玻璃透光度</string>
 </resources>
