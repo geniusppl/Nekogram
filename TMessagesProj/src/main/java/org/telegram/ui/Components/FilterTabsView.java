@@ -73,6 +73,9 @@ import java.util.ArrayList;
 import java.util.Map;
 
 import tw.nekomimi.nekogram.NekoConfig;
+import tw.nekomimi.nekogram.glass.FlClashLens;
+import tw.nekomimi.nekogram.glass.JellyGlassIndicator;
+import tw.nekomimi.nekogram.glass.NekoGlass;
 import tw.nekomimi.nekogram.folder.FolderIconHelper;
 
 @SuppressLint("ViewConstructor")
@@ -1404,8 +1407,11 @@ public class FilterTabsView extends FrameLayout {
 
     @Override
     protected boolean drawChild(@NonNull Canvas canvas, View child, long drawingTime) {
+        if (child == listView && jelly != null) {
+            drawJellyPlatter(canvas);
+        }
         boolean result = super.drawChild(canvas, child, drawingTime);
-        if (child == listView) {
+        if (child == listView && jelly == null) {
             drawSelector(canvas);
         }
         long newTime = SystemClock.elapsedRealtime();
@@ -1515,6 +1521,21 @@ public class FilterTabsView extends FrameLayout {
                 counterVisible = tabView.tabCounterVisible;
             }
         }
+        if (jelly != null) {
+            if (indicatorWidth == 0) {
+                return;
+            }
+            // Neko Liquid Glass: the selector's box in this view, for the jelly lens
+            final float add = additionalTabWidth / 2f;
+            final float l = indicatorX - dp(TAB_INTERNAL_PADDING) - add;
+            final float r = indicatorX + indicatorWidth + dp(TAB_INTERNAL_PADDING) + add;
+            final float px = listView.getPivotX() + listView.getX();
+            final float sx = listView.getScaleX();
+            jellyTarget.set(px + (l - px) * sx + listView.getTranslationX(), height / 2f - dp(14),
+                px + (r - px) * sx + listView.getTranslationX(), height / 2f + dp(14));
+            jellyHasTarget = true;
+            return;
+        }
         if (indicatorWidth != 0) {
             canvas.save();
             canvas.translate(listView.getTranslationX(), 0);
@@ -1545,6 +1566,167 @@ public class FilterTabsView extends FrameLayout {
         canvas.save();
         canvas.clipPath(clipPath);
         super.dispatchDraw(canvas);
+        canvas.restore();
+        if (jelly != null) {
+            drawJellyLens(canvas);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Nekogram Liquid Glass: FlClash NavigationDock lens on the folder tabs, the same
+    // JellyGlassIndicator springs and FlClashLens shader passes as the bottom main tabs bar
+    // (prism_ui, https://github.com/chen08209/prism_ui, GPL-3.0). Off => jelly == null.
+    // ---------------------------------------------------------------------------------------
+
+    private final JellyGlassIndicator jelly = NekoGlass.isActive() ? new JellyGlassIndicator(this) : null;
+    private final Object flclashLens = jelly != null && android.os.Build.VERSION.SDK_INT >= 33 ? FlClashLens.create() : null;
+    private final RectF jellyTarget = new RectF();
+    private final RectF jellyRect = new RectF();
+    private boolean jellyHasTarget;
+    private boolean jellyTouching;
+    private boolean jellySwiping;
+    private float jellyDownX;
+    private boolean jellyWasFollowing;
+    private long jellyFollowEnd;
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (jelly != null) {
+            switch (ev.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    if (!isEditing && isEnabled()) {
+                        jellyTouching = true;
+                        jellyDownX = ev.getX();
+                        jelly.setPressed(true);
+                        invalidate();
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (jellyTouching) {
+                        jellyTouching = false;
+                        if (!jellySwiping) {
+                            jelly.setPressed(false);
+                        }
+                        invalidate();
+                    }
+                    break;
+            }
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    /** The tab under x, in this view, as its selector box would be. */
+    private boolean jellyTabAt(float x, RectF out) {
+        for (int i = 0, N = listView.getChildCount(); i < N; i++) {
+            final View child = listView.getChildAt(i);
+            if (!(child instanceof TabView)) {
+                continue;
+            }
+            final float left = listView.getX() + listView.getTranslationX() + child.getX();
+            if (x >= left && x <= left + child.getWidth()) {
+                final TabView tab = (TabView) child;
+                final float w = Math.max(dp(16), tab.tabWidth) + dp(TAB_INTERNAL_PADDING) * 2 + additionalTabWidth;
+                final float cx = left + child.getWidth() / 2f;
+                out.set(cx - w / 2f, getMeasuredHeight() / 2f - dp(14), cx + w / 2f, getMeasuredHeight() / 2f + dp(14));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void drawJellyPlatter(Canvas canvas) {
+        jellyHasTarget = false;
+        drawSelector(canvas); // fills jellyTarget
+        final boolean swiping = manualScrollingToPosition != -1;
+        if (swiping != jellySwiping) {
+            jellySwiping = swiping;
+            // a page swipe lifts the lens as a press does
+            if (swiping) {
+                jelly.setPressed(true);
+            } else if (!jellyTouching) {
+                jelly.setPressed(false);
+            }
+        }
+        if (!jellyHasTarget) {
+            return;
+        }
+        float cx = jellyTarget.centerX();
+        float w = jellyTarget.width();
+        int mode = JellyGlassIndicator.MODE_TRAVEL;
+        final long now = SystemClock.uptimeMillis();
+        if (swiping) {
+            mode = JellyGlassIndicator.MODE_FOLLOW;
+        } else if (jellyTouching && !animatingIndicator && jellyTabAt(jellyDownX, jellyRect)) {
+            cx = jellyRect.centerX();
+            w = jellyRect.width();
+        }
+        if (mode == JellyGlassIndicator.MODE_FOLLOW) {
+            jellyWasFollowing = true;
+        } else if (jellyWasFollowing) {
+            jellyWasFollowing = false;
+            jellyFollowEnd = now;
+        }
+        if (mode != JellyGlassIndicator.MODE_FOLLOW && now - jellyFollowEnd < 700) {
+            mode = JellyGlassIndicator.MODE_SETTLE;
+        }
+        jelly.setPitch(Math.max(dp(48), w));
+        jelly.setTarget(cx, w, mode);
+        jelly.step();
+        jelly.getRect(jellyRect, jellyTarget.centerY(), jellyTarget.height(), dp(FlClashLens.LENS_GROWTH_DP));
+        if (jellyRect.height() > getMeasuredHeight()) {
+            jellyRect.inset(0, (jellyRect.height() - getMeasuredHeight()) / 2f);
+        }
+        final float lift = jelly.getLift();
+        if (lift < 1f) {
+            NekoGlass.drawPill(canvas, jellyRect, jellyRect.height() / 2f, Theme.getColor(tabLineColorKey, resourcesProvider), 0f, (1f - Math.max(0f, lift)) * listView.getAlpha());
+        }
+    }
+
+    private void drawJellyLens(Canvas canvas) {
+        if (!jellyHasTarget || jelly.getLift() <= 0.004f || android.os.Build.VERSION.SDK_INT < 33 || flclashLens == null) {
+            return;
+        }
+        drawFlClashLens(canvas);
+    }
+
+    @androidx.annotation.RequiresApi(api = 33)
+    private void drawFlClashLens(Canvas canvas) {
+        final FlClashLens lens = (FlClashLens) flclashLens;
+        final Drawable backdrop = getBackground();
+        if (lens.isFailed() || backdrop == null || !canvas.isHardwareAccelerated()) {
+            return;
+        }
+        final float lift = jelly.getLift();
+        final float r = jellyRect.height() / 2f;
+        final boolean dark = Theme.isCurrentThemeDark();
+        final int w = getWidth(), h = getHeight();
+        lens.drawShadow(canvas, jellyRect, lift, dark);
+        if (!lens.drawGlass(canvas, w, h, jellyRect, r, lift, dark, backdrop, 0, 0, w, h)) {
+            return;
+        }
+        lens.drawContent(canvas, w, h, jellyRect, r, lift, dark,
+            Theme.getColor(tabLineColorKey, resourcesProvider), lensContentPainter);
+    }
+
+    private final FlClashLens.ContentPainter lensContentPainter = this::drawTabsMagnified;
+
+    /** _LensTint: every tab scaled about its own center. */
+    private void drawTabsMagnified(Canvas canvas, float magnify) {
+        canvas.save();
+        canvas.clipPath(clipPath);
+        canvas.translate(listView.getX() + listView.getTranslationX(), listView.getY());
+        for (int i = 0, N = listView.getChildCount(); i < N; i++) {
+            final View child = listView.getChildAt(i);
+            if (child.getVisibility() != View.VISIBLE || child.getWidth() <= 0) {
+                continue;
+            }
+            canvas.save();
+            canvas.translate(child.getX(), child.getY());
+            canvas.scale(magnify, magnify, child.getWidth() / 2f, child.getHeight() / 2f);
+            child.draw(canvas);
+            canvas.restore();
+        }
         canvas.restore();
     }
 
