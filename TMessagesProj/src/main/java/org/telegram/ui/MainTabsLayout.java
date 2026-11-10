@@ -448,7 +448,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
     }
 
     private final BoolAnimator animatorIsScaled = new BoolAnimator(0, (a, factor, c, g) -> {
-        if (jelly != null) {
+        if (hasJelly()) {
             return;
         }
         setScaleX(lerp(1, 1.019f, factor));
