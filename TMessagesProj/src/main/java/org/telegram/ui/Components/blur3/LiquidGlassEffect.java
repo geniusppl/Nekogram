@@ -17,10 +17,18 @@ public class LiquidGlassEffect {
     private final RuntimeShader shader;
     private RenderEffect effect;
 
+    private final boolean neko;
+
     public LiquidGlassEffect(RenderNode node) {
         this.node = node;
-        final String code = AndroidUtilities.readRes(R.raw.liquid_glass_shader);
-        shader = new RuntimeShader(code);
+        // Nekogram: the Liquid Glass master switch swaps in the KunBox-like optics shader
+        neko = tw.nekomimi.nekogram.glass.NekoGlass.isActive();
+        if (neko) {
+            shader = tw.nekomimi.nekogram.glass.NekoGlass.createShader();
+        } else {
+            final String code = AndroidUtilities.readRes(R.raw.liquid_glass_shader);
+            shader = new RuntimeShader(code);
+        }
         node.setRenderEffect(effect = RenderEffect.createRuntimeShaderEffect(shader, "img"));
     }
 
@@ -95,6 +103,10 @@ public class LiquidGlassEffect {
             shader.setFloatUniform("refract_intensity", this.intensity = intensity);
             shader.setFloatUniform("refract_index", this.index = index);
             shader.setFloatUniform("foreground_color_premultiplied", r, g, b, a);
+            if (neko) {
+                tw.nekomimi.nekogram.glass.NekoGlass.setOpticsUniforms(shader, width, height, false,
+                    tw.nekomimi.nekogram.glass.NekoGlass.isDark(foregroundColor | 0xFF000000));
+            }
             node.setRenderEffect(effect = RenderEffect.createRuntimeShaderEffect(shader, "img"));
         }
     }

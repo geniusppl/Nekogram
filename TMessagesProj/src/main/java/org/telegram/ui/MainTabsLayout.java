@@ -7,6 +7,11 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.os.SystemClock;
+import android.view.HapticFeedbackConstants;
+import android.view.ViewConfiguration;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,6 +30,9 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.AnimatedLinearLayout;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.glass.GlassTabView;
+
+import tw.nekomimi.nekogram.glass.JellyGlassIndicator;
+import tw.nekomimi.nekogram.glass.NekoGlass;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -295,7 +303,7 @@ public class MainTabsLayout extends AnimatedLinearLayout {
             }
 
             if (child instanceof GlassTabView) {
-                ((GlassTabView) child).setSkipDrawSelector(skipDrawSelector);
+                ((GlassTabView) child).setSkipDrawSelector(skipDrawSelector || jelly != null);
             }
         }
         invalidate();
@@ -309,6 +317,9 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
+        if (jelly != null && drawJelly(canvas)) {
+            return;
+        }
         if (drawCustomSelector) {
             final float x = animatedLongSelectedViewCenterX + animatedLongSelectedViewOffsetX;
             final float sWidth = getInterpolatedWidthByX(x, this);
@@ -605,6 +616,9 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (jelly != null && handleJellyTouch(ev)) {
+            return true;
+        }
         clickHelper.onTouchEvent(this, ev);
         return super.dispatchTouchEvent(ev);
     }
@@ -719,5 +733,215 @@ public class MainTabsLayout extends AnimatedLinearLayout {
 
     private static float getCenterX(View v) {
         return v.getX() + v.getWidth() * 0.5f;
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Nekogram Liquid Glass: jelly glass pill indicator.
+    // Drag/stretch/squash/settle behaviour ported from prism_ui NavigationDock
+    // (https://github.com/chen08209/prism_ui, FlClash, GPL-3.0). Only active when the
+    // Neko "Liquid Glass" switch is on; otherwise jelly == null and nothing below runs.
+    // ---------------------------------------------------------------------------------------
+
+    private final JellyGlassIndicator jelly = NekoGlass.isActive() ? new JellyGlassIndicator(this) : null;
+    private final RectF jellyRect = new RectF();
+    private final Path jellyPath = new Path();
+    private boolean jellyDragging;
+    private float jellyDownX;
+    private float jellyDragX;
+    private View jellyDragStartSelected;
+    private View jellyHover;
+    private float jellyGestureX = Float.NaN;
+    private long jellyGestureTime;
+    private long jellyFollowEndTime;
+    private boolean jellyWasFollowing;
+
+    public boolean hasJelly() {
+        return jelly != null;
+    }
+
+    /** Center x of the pager position under the finger, or NaN when the pager is not dragged. */
+    public void setJellyGestureX(float x) {
+        if (jelly == null) {
+            return;
+        }
+        jellyGestureX = x;
+        jellyGestureTime = SystemClock.uptimeMillis();
+        invalidate();
+    }
+
+    @Override
+    public void onViewAdded(View child) {
+        super.onViewAdded(child);
+        if (jelly != null && child instanceof GlassTabView) {
+            ((GlassTabView) child).setSkipDrawSelector(true);
+        }
+    }
+
+    private float jellyPitch() {
+        int count = 0;
+        float sum = 0;
+        for (int i = 0; i < getChildCount(); i++) {
+            final View v = getChildAt(i);
+            if (v.getVisibility() == View.VISIBLE && v.getWidth() > 0) {
+                sum += v.getWidth();
+                count++;
+            }
+        }
+        return count == 0 ? dp(64) : sum / count;
+    }
+
+    private boolean drawJelly(Canvas canvas) {
+        final float height = getHeight() - getPaddingTop() - getPaddingBottom();
+        if (height <= 0) {
+            return false;
+        }
+        final long now = SystemClock.uptimeMillis();
+        float targetX;
+        int mode;
+        if (jellyDragging) {
+            targetX = jellyDragX;
+            mode = JellyGlassIndicator.MODE_FOLLOW;
+        } else if (isInLongPress) {
+            targetX = animatedLongSelectedViewCenterX + animatedLongSelectedViewOffsetX;
+            mode = JellyGlassIndicator.MODE_FOLLOW;
+        } else if (!Float.isNaN(jellyGestureX) && now - jellyGestureTime < 400) {
+            targetX = jellyGestureX;
+            mode = JellyGlassIndicator.MODE_FOLLOW;
+        } else {
+            final View selected = findSelectedTab();
+            if (selected == null) {
+                return false;
+            }
+            targetX = getCenterX(selected);
+            mode = now - jellyFollowEndTime < 700 ? JellyGlassIndicator.MODE_SETTLE : JellyGlassIndicator.MODE_TRAVEL;
+        }
+        if (mode == JellyGlassIndicator.MODE_FOLLOW) {
+            jellyWasFollowing = true;
+        } else if (jellyWasFollowing) {
+            jellyWasFollowing = false;
+            jellyFollowEndTime = now;
+            mode = JellyGlassIndicator.MODE_SETTLE;
+        }
+        final float targetW = getInterpolatedWidthByX(clampXToChildrenCenters(targetX, this), this);
+        if (targetW <= 0) {
+            return false;
+        }
+        jelly.setPitch(jellyPitch());
+        jelly.setTarget(targetX, targetW, mode);
+        jelly.step();
+        jelly.getRect(jellyRect, getPaddingTop() + height / 2f, height, dp(3));
+        final float r = jellyRect.height() / 2f;
+        final float lift = jelly.getLift();
+
+        NekoGlass.drawPill(canvas, jellyRect, r, Theme.getColor(Theme.key_glass_tabSelected, resourcesProvider), lift, 1f);
+
+        if (lift > 0.02f) {
+            // the lifted lens magnifies what is under it (prism_ui _lensMagnify = 0.16)
+            jellyPath.rewind();
+            jellyPath.addRoundRect(jellyRect, r, r, Path.Direction.CW);
+            canvas.save();
+            canvas.clipOutPath(jellyPath);
+            super.dispatchDraw(canvas);
+            canvas.restore();
+            canvas.save();
+            canvas.clipPath(jellyPath);
+            final float s = 1f + 0.16f * lift;
+            canvas.scale(s, s, jellyRect.centerX(), jellyRect.centerY());
+            super.dispatchDraw(canvas);
+            canvas.restore();
+        } else {
+            super.dispatchDraw(canvas);
+        }
+        return true;
+    }
+
+    private void updateJellyDrag(float x) {
+        float min = Float.MAX_VALUE, max = -Float.MAX_VALUE;
+        for (int i = 0; i < getChildCount(); i++) {
+            final View v = getChildAt(i);
+            if (v.getVisibility() != View.VISIBLE) continue;
+            final float c = getCenterX(v);
+            min = Math.min(min, c);
+            max = Math.max(max, c);
+        }
+        if (min > max) {
+            return;
+        }
+        final float pitch = jellyPitch();
+        float cx = x;
+        if (x < min) {
+            cx = min + JellyGlassIndicator.rubberBand(x - min, pitch * JellyGlassIndicator.OVERDRAG);
+        } else if (x > max) {
+            cx = max + JellyGlassIndicator.rubberBand(x - max, pitch * JellyGlassIndicator.OVERDRAG);
+        }
+        final float overshoot = x - Math.max(0, Math.min(getWidth(), x));
+        jelly.setPull(JellyGlassIndicator.rubberBand(overshoot, Math.min(getWidth(), getHeight()) * 7f / 32f));
+        jellyDragX = cx;
+        final View found = findNearestVisibleChildByX(clampXToChildrenCenters(cx, this), this);
+        if (found != null && found != jellyHover) {
+            jellyHover = found;
+            setTabSelected(found, true);
+            try {
+                performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+            } catch (Exception ignore) {
+            }
+        }
+        invalidate();
+    }
+
+    private boolean handleJellyTouch(MotionEvent ev) {
+        switch (ev.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                jellyDragging = false;
+                jellyDownX = ev.getX();
+                jelly.setPressed(true);
+                invalidate();
+                return false;
+            case MotionEvent.ACTION_MOVE:
+                if (!jellyDragging) {
+                    if (isInLongPress || Math.abs(ev.getX() - jellyDownX) < ViewConfiguration.get(getContext()).getScaledTouchSlop()) {
+                        return false;
+                    }
+                    jellyDragging = true;
+                    jellyDragStartSelected = findSelectedTab();
+                    jellyHover = jellyDragStartSelected;
+                    final MotionEvent cancel = MotionEvent.obtain(ev);
+                    cancel.setAction(MotionEvent.ACTION_CANCEL);
+                    clickHelper.onTouchEvent(this, cancel);
+                    super.dispatchTouchEvent(cancel);
+                    cancel.recycle();
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
+                }
+                updateJellyDrag(ev.getX());
+                return true;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                jelly.setPressed(false);
+                invalidate();
+                if (!jellyDragging) {
+                    return false;
+                }
+                jellyDragging = false;
+                jelly.setPull(0);
+                View target = null;
+                if (ev.getActionMasked() == MotionEvent.ACTION_UP) {
+                    // carry a flick on, as prism_ui _fling does (100ms projection)
+                    final float pitch = jellyPitch();
+                    final float projected = jellyDragX + Math.max(-pitch, Math.min(pitch, jelly.getVelocity() * 0.1f));
+                    target = findNearestVisibleChildByX(clampXToChildrenCenters(projected, this), this);
+                }
+                if (target != null && target != jellyDragStartSelected) {
+                    setTabSelected(target, true);
+                    target.performClick();
+                } else if (jellyDragStartSelected != null) {
+                    setTabSelected(jellyDragStartSelected, true);
+                }
+                jellyDragStartSelected = null;
+                jellyHover = null;
+                return true;
+        }
+        return jellyDragging;
     }
 }

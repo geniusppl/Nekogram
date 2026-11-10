@@ -351,4 +351,7 @@
 
     <!-- Accessibility -->
     <string name="AccessibilitySettings">Accessibility settings</string>
+    <string name="LiquidGlass">Liquid Glass</string>
+    <string name="LiquidGlassInfo">Lens refraction, blur and highlights on bars, tabs, menus, dialogs and message bubbles. Uses more GPU.</string>
+    <string name="LiquidGlassRequires13">Requires Android 13+</string>
 </resources>

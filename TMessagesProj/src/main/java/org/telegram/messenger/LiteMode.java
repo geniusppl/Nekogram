@@ -147,6 +147,10 @@ public class LiteMode {
     }
 
     public static boolean isEnabled(int flag) {
+        if ((flag == FLAG_LIQUID_GLASS || flag == FLAG_CHAT_BLUR) && tw.nekomimi.nekogram.glass.NekoGlass.isActive()) {
+            // Neko "Liquid Glass" master switch forces glass + chat blur regardless of performance class
+            return true;
+        }
         if (flag == FLAG_CHAT_FORUM_TWOCOLUMN && AndroidUtilities.isTablet()) {
             // always enabled for tablets
             return true;

@@ -18,6 +18,7 @@ import org.telegram.ui.LaunchActivity;
 import java.util.ArrayList;
 
 import tw.nekomimi.nekogram.NekoConfig;
+import tw.nekomimi.nekogram.glass.NekoGlass;
 import tw.nekomimi.nekogram.helpers.EmojiHelper;
 
 public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
@@ -40,6 +41,7 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
     private final int tabsPositionRow = rowId++;
 
     private final int strokeOnViewsRow = rowId++;
+    private final int liquidGlassRow = rowId++;
 
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
@@ -78,6 +80,10 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
 
         items.add(UItem.asHeader(LocaleController.getString(R.string.LiteOptionsBlur2)));
         items.add(UItem.asCheck(strokeOnViewsRow, LocaleController.getString(R.string.StrokeOnViews)).setChecked(NekoConfig.strokeOnViews).slug("strokeOnViews"));
+        items.add(UItem.asCheck(liquidGlassRow, LocaleController.getString(R.string.LiquidGlass), LocaleController.getString(NekoGlass.isSupported() ? R.string.LiquidGlassInfo : R.string.LiquidGlassRequires13))
+                .setChecked(NekoConfig.liquidGlass && NekoGlass.isSupported())
+                .setEnabled(NekoGlass.isSupported())
+                .slug("liquidGlass"));
         items.add(UItem.asShadow(null));
 
     }
@@ -174,6 +180,16 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity {
                 listView.adapter.notifyItemChanged(position, PARTIAL);
                 parentLayout.rebuildAllFragmentViews(false, false);
             });
+        } else if (id == liquidGlassRow) {
+            if (!NekoGlass.isSupported()) {
+                return;
+            }
+            NekoConfig.toggleLiquidGlass();
+            if (view instanceof TextCheckCell) {
+                ((TextCheckCell) view).setChecked(NekoConfig.liquidGlass);
+            }
+            parentLayout.rebuildAllFragmentViews(false, false);
+            showRestartBulletin();
         } else if (id == strokeOnViewsRow) {
             NekoConfig.toggleStrokeOnViews();
             if (view instanceof TextCheckCell) {

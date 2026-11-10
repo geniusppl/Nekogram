@@ -844,6 +844,22 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             final float visibility = Math.max(0, 1f - Math.abs(position - animatedPosition));
             tabs[index].setGestureSelectedOverride(visibility, allow);
         }
+        if (tabsView.hasJelly()) {
+            // Neko Liquid Glass: the jelly pill follows the swipe between pages
+            float sum = 0, cx = 0;
+            for (int index = 0; index < tabs.length; index++) {
+                final GlassTabView tab = tabs[index];
+                if (tab == null || tab.getVisibility() != View.VISIBLE || tab.getParent() != tabsView || tab.getWidth() <= 0) {
+                    continue;
+                }
+                final float visibility = Math.max(0, 1f - Math.abs(indexToPosition(index) - animatedPosition));
+                if (visibility > 0) {
+                    cx += visibility * (tab.getX() + tab.getWidth() / 2f);
+                    sum += visibility;
+                }
+            }
+            tabsView.setJellyGestureX(allow && sum > 0 ? cx / sum : Float.NaN);
+        }
         tabsView.invalidate();
     }
 

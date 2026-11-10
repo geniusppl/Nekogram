@@ -137,6 +137,7 @@ public class NekoConfig {
     public static boolean showTranslate = true;
     public static boolean silenceNonContacts = false;
     public static boolean strokeOnViews = true;
+    public static boolean liquidGlass = false;
     public static boolean tryToOpenAllLinksInIV = false;
     public static boolean unmuteVideosWithVolumeButtons = true;
     public static boolean useSystemEmoji = false;
@@ -244,6 +245,7 @@ public class NekoConfig {
             showTranslate = preferences.getBoolean("showTranslate", true);
             silenceNonContacts = preferences.getBoolean("silenceNonContacts", false);
             strokeOnViews = preferences.getBoolean("strokeOnViews", true);
+            liquidGlass = preferences.getBoolean("nekoLiquidGlass", false);
             tryToOpenAllLinksInIV = preferences.getBoolean("tryToOpenAllLinksInIV", false);
             unmuteVideosWithVolumeButtons = preferences.getBoolean("unmuteVideosWithVolumeButtons", true);
             useSystemEmoji = preferences.getBoolean("useSystemEmoji", false);
@@ -1129,6 +1131,11 @@ public class NekoConfig {
     public static void toggleSilenceNonContacts() {
         silenceNonContacts = !silenceNonContacts;
         preferences.edit().putBoolean("silenceNonContacts", silenceNonContacts).apply();
+    }
+
+    public static void toggleLiquidGlass() {
+        liquidGlass = !liquidGlass;
+        preferences.edit().putBoolean("nekoLiquidGlass", liquidGlass).apply();
     }
 
     public static void toggleStrokeOnViews() {

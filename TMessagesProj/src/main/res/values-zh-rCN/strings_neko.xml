@@ -347,4 +347,7 @@
     <string name="InvalidPassQr">通行密钥二维码无效</string>
     <!-- Accessibility -->
     <string name="AccessibilitySettings">无障碍设置</string>
+    <string name="LiquidGlass">液态玻璃</string>
+    <string name="LiquidGlassInfo">为标题栏、标签栏、菜单、弹窗和消息气泡加入透镜折射、模糊与高光，会更耗 GPU</string>
+    <string name="LiquidGlassRequires13">需要 Android 13+</string>
 </resources>

@@ -1,0 +1,77 @@
+// Nekogram "Liquid Glass" optics (used only when Neko settings -> Appearance -> Liquid Glass is on).
+// Lens refraction (circle-mapped edge displacement), vibrancy and a specular rim, tuned after
+// KunBox (https://github.com/roseforljh/KunBox, MIT; Kyant backdrop: vibrancy + blur + lens)
+// and prism_ui's liquid_glass.frag (https://github.com/chen08209/prism_ui, GPL-3.0).
+// Uniform names are shared with liquid_glass_shader.agsl so LiquidGlassEffect can drive both.
+uniform shader img;
+
+uniform float2 resolution;
+uniform float2 center;
+uniform float2 size;
+uniform float4 radius;
+uniform float thickness;
+uniform float refract_index;
+uniform float refract_intensity;
+uniform float4 foreground_color_premultiplied;
+
+uniform float lens_height;
+uniform float lens_amount;
+uniform float vibrancy;
+uniform float highlight;
+uniform float rim_width;
+
+float sdfRect(float2 p, float4 r) {
+  r.xy = (p.x > 0.0) ? r.xy : r.zw;
+  r.x  = (p.y > 0.0) ? r.x  : r.y;
+  float2 q = abs(p) - size + r.x;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r.x;
+}
+
+half4 srcOver(half4 src, half4 dst) {
+  return half4(src.rgb + dst.rgb * (1.0 - src.a), src.a + (1.0 - src.a) * dst.a);
+}
+
+half4 main(float2 fragCoord) {
+  float2 p = fragCoord - center;
+  float sd = sdfRect(p, radius);
+  float2 uv = fragCoord;
+  float edge = 0.0;
+  float2 n = float2(0.0, -1.0);
+  // keeps every uniform referenced (the Java side sets all of them)
+  float guard = (thickness + refract_index + refract_intensity + resolution.x) * 0.0;
+  if (sd < 0.0) {
+    float sdX = sdfRect(p + float2(1.0, 0.0), radius);
+    float sdY = sdfRect(p + float2(0.0, 1.0), radius);
+    float2 g = float2(sdX - sd, sdY - sd);
+    float gl = length(g);
+    n = gl > 0.0001 ? g / gl : float2(0.0, -1.0);
+    float depth = -sd;
+    if (depth < lens_height && lens_height > 0.0) {
+      float x = 1.0 - depth / lens_height;
+      float circle = 1.0 - sqrt(max(1.0 - x * x, 0.0));
+      uv -= n * circle * lens_amount;
+      edge = x;
+    }
+  }
+  uv += guard;
+
+  half4 c = img.eval(uv);
+
+  // vibrancy: saturation boost, kept inside the premultiplied range
+  half lum = dot(c.rgb, half3(0.2126, 0.7152, 0.0722));
+  c.rgb = clamp(mix(half3(lum), c.rgb, half(vibrancy)), half3(0.0), half3(c.a));
+
+  c = srcOver(half4(foreground_color_premultiplied), c);
+
+  if (sd < 0.0) {
+    // soft inner glow along the lens band
+    float glow = highlight * 0.10 * edge * edge;
+    // specular rim, lit from the top-left and (weaker) from the bottom-right
+    float rim = rim_width > 0.0 ? clamp(1.0 + sd / rim_width, 0.0, 1.0) : 0.0;
+    float facing = dot(n, normalize(float2(-0.6, -1.0)));
+    float light = 0.35 + 0.65 * max(facing, 0.0) + 0.35 * max(-facing, 0.0);
+    half h = half(clamp(highlight * rim * light + glow, 0.0, 1.0));
+    c = srcOver(half4(h, h, h, h), c);
+  }
+  return c;
+}
