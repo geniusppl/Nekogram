@@ -308,7 +308,10 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
                     continue;
                 }
                 if (TextUtils.isEmpty(item.slug)) continue;
-                searchResultList.add(new SearchResult(i * 1000 + item.id, item.text.toString(), null, fragmentTitle, fragmentTitle.equals(headerText) ? null : headerText, icon, () -> {
+                // Sliders (e.g. Liquid Glass radius/transparency) have no text: index them under their header.
+                final CharSequence itemText = item.text != null ? item.text : headerText;
+                if (TextUtils.isEmpty(itemText)) continue;
+                searchResultList.add(new SearchResult(i * 1000 + item.id, itemText.toString(), null, fragmentTitle, fragmentTitle.equals(headerText) ? null : headerText, icon, () -> {
                     var fragment1 = createFragment(icon);
                     presentFragment(fragment1);
                     fragment1.scrollToRow(item.slug, null);
